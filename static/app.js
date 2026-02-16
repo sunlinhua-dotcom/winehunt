@@ -57,8 +57,9 @@ async function loadDashboard() {
         }
 
         const lastScanEl = document.getElementById('lastScan');
-        if (data.last_scan_time) {
-            lastScanEl.textContent = formatRelativeTime(data.last_scan_time);
+        const lastScanValue = data.last_scan_time || data.last_scan;
+        if (lastScanValue) {
+            lastScanEl.textContent = formatRelativeTime(lastScanValue);
         }
 
         // Load latest opportunities
@@ -195,7 +196,7 @@ async function pollScanStatus() {
             const data = await res.json();
             updateScanUI(data);
 
-            if (data.status === 'completed' || data.status === 'idle') {
+            if (data.status === 'completed' || data.status === 'idle' || data.status === 'completed_with_errors') {
                 endScan(data);
                 return;
             }

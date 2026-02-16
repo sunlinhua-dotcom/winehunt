@@ -5,11 +5,14 @@
 import aiosqlite
 import os
 import json
+import logging
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 # 优先从环境变量读取 DB_PATH，方便本地调试和 Zeabur 持久化挂载
 DB_PATH = os.getenv("DB_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "wine_deals.db"))
-print(f"DEBUG: DB_PATH is {DB_PATH}")
+logger.info(f"DB_PATH: {DB_PATH}")
 
 
 async def get_db():

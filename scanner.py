@@ -99,6 +99,12 @@ async def run_full_scan(profit_threshold: float = 15, notify: bool = True) -> di
                 # 3. 分析是否为捡漏机会
                 opp = analyze_opportunity(wine_info, wine_config, profit_threshold)
                 if opp:
+                    # 确保 buy_url 指向 Wine-Searcher 搜索页
+                    buy_url = opp.get("buy_url", "")
+                    if not buy_url or ('wine-searcher.com' not in buy_url):
+                        ws_query = wine_name.replace(' ', '+')
+                        opp["buy_url"] = f"https://www.wine-searcher.com/find/{ws_query}/1/a"
+
                     # 保存到数据库
                     opp_id = await save_opportunity(opp)
                     opp["id"] = opp_id
