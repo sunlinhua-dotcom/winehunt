@@ -146,7 +146,7 @@ async def api_stats():
     """获取总览统计数据"""
     stats = await get_stats()
     stats["scanning"] = is_scanning()
-    stats["premium_wines_count"] = len(PREMIUM_WINES)
+    stats["premium_wines_count"] = len(ALL_WINES)
     return stats
 
 
@@ -233,7 +233,7 @@ async def api_trigger_scan(background_tasks: BackgroundTasks):
 
     threshold = float(os.getenv("PROFIT_THRESHOLD", "15"))
     background_tasks.add_task(run_full_scan, profit_threshold=threshold, notify=True)
-    return {"status": "started", "message": "扫描已在后台启动", "total": len(PREMIUM_WINES)}
+    return {"status": "started", "message": "扫描已在后台启动", "total": len(ALL_WINES)}
 
 
 @app.get("/api/scan/status")

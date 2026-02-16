@@ -190,21 +190,21 @@ async def _fetch_with_httpx(url: str) -> Optional[str]:
         return None
 
 
-# ── 统一请求函数（瀑布式降级）───────────────────
+# ── 统一请求函数（瀑布式降级 — curl_cffi 优先省 API 额度）──
 async def _smart_fetch(url: str) -> Optional[str]:
     """
     依次尝试三个引擎，直到成功：
-    1. ScraperAPI（免费代理，绕过 IP 封锁，最可靠）
-    2. curl_cffi（TLS 指纹伪装，IP 未封时可用）
+    1. curl_cffi（免费无限次，TLS 指纹伪装）← 优先
+    2. ScraperAPI（付费额度，仅 curl_cffi 失败时使用）
     3. httpx（基础请求，兜底）
     """
-    # 引擎 1: ScraperAPI（优先，绕过 IP 封锁）
-    html = await _fetch_with_scraper_api(url)
+    # 引擎 1: curl_cffi（免费，优先使用）
+    html = await _fetch_with_curl_cffi(url, max_retries=2)
     if html:
         return html
 
-    # 引擎 2: curl_cffi（IP 未封时有效）
-    html = await _fetch_with_curl_cffi(url, max_retries=2)
+    # 引擎 2: ScraperAPI（仅 curl_cffi 失败时使用，节省额度）
+    html = await _fetch_with_scraper_api(url)
     if html:
         return html
 
@@ -460,24 +460,62 @@ async def get_hk_average_price(wine_name: str) -> Optional[float]:
 
 
 async def search_wine_basic(wine_name: str) -> dict:
-    """搜索一款酒基本信息"""
-    global_lowest = await get_global_lowest_price(wine_name)
-    if not global_lowest:
+    """
+    搜索一款酒基本信息 — 单请求合并版
+    只发 1 次请求，同时提取全球最低价和香港均价
+    相比旧版（2 次请求）节省 50% API 调用
+    """
+    search_query = wine_name.replace(' ', '+')
+    url = f"{BASE_URL}/find/{search_query}/1/a"
+    ws_search_url = url  # 统一直达链接
+
+    await _random_delay(2, 5)
+    html = await _smart_fetch(url)
+
+    if not html:
         return {"wine_name": wine_name, "found": False}
 
-    # 构建 Wine-Searcher 搜索结果页 URL 作为统一直达链接
-    search_query = wine_name.replace(' ', '+')
-    ws_search_url = f"{BASE_URL}/find/{search_query}/1/a"
+    results = _parse_wine_page(html)
+    if not results:
+        return {"wine_name": wine_name, "found": False}
 
-    # 如果爬到的 url 是酒商主页（非 wine-searcher），替换为搜索页
+    # ── 从同一批结果中分离全球最低价和香港报价 ──
+
+    # 1. 全球最低价
+    results.sort(key=lambda x: x["price_usd"])
+    global_lowest = results[0]
+
+    # 修正链接
     if global_lowest.get("url") and 'wine-searcher.com' not in global_lowest["url"]:
         global_lowest["url"] = ws_search_url
     elif not global_lowest.get("url"):
         global_lowest["url"] = ws_search_url
 
-    await _random_delay(3, 6)
+    # 2. 提取香港报价（从同一页面，不需要额外请求！）
+    hk_results = [
+        r for r in results
+        if 'hong kong' in r.get('country', '').lower()
+        or 'hk' == r.get('country', '').lower()
+    ]
 
-    hk_avg = await get_hk_average_price(wine_name)
+    hk_avg = None
+    if hk_results:
+        hk_prices = [r["price_usd"] for r in hk_results if r["price_usd"] > 0]
+        if hk_prices:
+            # 异常值过滤
+            hk_prices.sort()
+            median = hk_prices[len(hk_prices) // 2]
+            filtered = [p for p in hk_prices if p < median * 5 and p > median * 0.2]
+            if not filtered:
+                filtered = hk_prices
+            hk_avg = sum(filtered) / len(filtered)
+            logger.info(f"📊 单请求提取 HK 均价 ({wine_name}): ${hk_avg:.2f} (样本 {len(filtered)})")
+
+    # 3. 如果全球页面没有 HK 报价，再单独请求 HK 页面（fallback）
+    if hk_avg is None:
+        logger.debug(f"全球页面无 HK 数据，尝试单独请求: {wine_name}")
+        await _random_delay(3, 6)
+        hk_avg = await get_hk_average_price(wine_name)
 
     return {
         "wine_name": wine_name,

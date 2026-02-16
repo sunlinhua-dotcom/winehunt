@@ -1,12 +1,16 @@
 """
 定时扫描模块
 自动扫描保值酒清单，发现捡漏机会
-智能缓存：24小时内已扫描且无机会的酒款跳过，大幅节省 API 额度
+优化策略：
+  - 单请求合并：全球+HK 数据一次请求搞定
+  - 自适应缓存：连续无机会的酒 TTL 从 24h→48h→72h 递增
+  - curl_cffi 优先：免费引擎优先，ScraperAPI 仅作后备
 """
 import asyncio
 import logging
+import random
 from datetime import datetime, timedelta
-from wine_list import PREMIUM_WINES
+from wine_list import ALL_WINES
 from scraper import search_wine_basic
 from analyzer import analyze_opportunity
 from database import save_opportunity, save_scan_log, save_price_history, get_stats, get_opportunities
@@ -26,21 +30,31 @@ _scan_progress = {
     "current_wine": "",
 }
 
-# ── 智能缓存：记录每款酒的最后扫描时间和结果 ──
-_scan_cache: dict = {}  # key=wine_name, value={"time": datetime, "had_opportunity": bool}
-CACHE_TTL = timedelta(hours=24)  # 无机会的酒款 24 小时跳过
+# ── 自适应缓存：连续无机会次数越多，TTL 越长 ──
+_scan_cache: dict = {}
+# key=wine_name, value={"time": datetime, "had_opportunity": bool, "miss_streak": int}
+
+# 自适应 TTL：连续无机会 0-1 次→24h, 2 次→48h, 3+ 次→72h
+def _get_cache_ttl(miss_streak: int) -> timedelta:
+    if miss_streak <= 1:
+        return timedelta(hours=24)
+    elif miss_streak == 2:
+        return timedelta(hours=48)
+    else:
+        return timedelta(hours=72)
 
 
 def _should_skip_wine(wine_name: str) -> bool:
-    """智能判断是否跳过某款酒（24h 内已扫描且无机会则跳过）"""
+    """智能判断是否跳过某款酒"""
     if wine_name not in _scan_cache:
         return False
     cache = _scan_cache[wine_name]
-    # 如果上次有机会，始终重扫（追踪价格变化）
+    # 有机会的始终重扫
     if cache.get("had_opportunity"):
         return False
-    # 如果 24h 内扫过且没机会，跳过
-    if datetime.now() - cache["time"] < CACHE_TTL:
+    # 根据连续无机会次数决定 TTL
+    ttl = _get_cache_ttl(cache.get("miss_streak", 0))
+    if datetime.now() - cache["time"] < ttl:
         return True
     return False
 
@@ -83,7 +97,11 @@ async def run_full_scan(profit_threshold: float = 15, notify: bool = True) -> di
     skipped = 0
     errors = []
     found_opportunities = []
-    total = len(PREMIUM_WINES)
+
+    # 随机打乱顺序，避免每次扫描模式相同触发反爬
+    wines_to_scan = list(ALL_WINES)
+    random.shuffle(wines_to_scan)
+    total = len(wines_to_scan)
 
     _scan_progress.update({
         "status": "running",
@@ -97,7 +115,7 @@ async def run_full_scan(profit_threshold: float = 15, notify: bool = True) -> di
     logger.info(f"🔍 开始扫描 {total} 款保值酒...")
 
     try:
-        for wine_config in PREMIUM_WINES:
+        for wine_config in wines_to_scan:
             wine_name = wine_config["name"]
             _scan_progress["current_wine"] = wine_name
 
@@ -115,8 +133,13 @@ async def run_full_scan(profit_threshold: float = 15, notify: bool = True) -> di
                 _scan_progress["scanned"] = wines_scanned + skipped
 
                 if not wine_info.get("found"):
-                    # 记录缓存：没找到数据也算无机会
-                    _scan_cache[wine_name] = {"time": datetime.now(), "had_opportunity": False}
+                    # 记录缓存：没找到数据，增加连续无机会计数
+                    prev = _scan_cache.get(wine_name, {})
+                    _scan_cache[wine_name] = {
+                        "time": datetime.now(),
+                        "had_opportunity": False,
+                        "miss_streak": prev.get("miss_streak", 0) + 1
+                    }
                     logger.debug(f"未找到数据: {wine_name}")
                     continue
 
@@ -149,15 +172,24 @@ async def run_full_scan(profit_threshold: float = 15, notify: bool = True) -> di
                     opportunities_found += 1
                     _scan_progress["found"] = opportunities_found
 
-                    # 记录缓存：有机会
-                    _scan_cache[wine_name] = {"time": datetime.now(), "had_opportunity": True}
+                    # 记录缓存：有机会，重置连续无机会计数
+                    _scan_cache[wine_name] = {
+                        "time": datetime.now(),
+                        "had_opportunity": True,
+                        "miss_streak": 0
+                    }
 
                     # 发送 Telegram 通知
                     if notify:
                         await notify_opportunity(opp)
                 else:
-                    # 记录缓存：无机会
-                    _scan_cache[wine_name] = {"time": datetime.now(), "had_opportunity": False}
+                    # 记录缓存：无机会，增加连续无机会计数
+                    prev = _scan_cache.get(wine_name, {})
+                    _scan_cache[wine_name] = {
+                        "time": datetime.now(),
+                        "had_opportunity": False,
+                        "miss_streak": prev.get("miss_streak", 0) + 1
+                    }
 
             except Exception as e:
                 error_msg = f"{wine_name}: {str(e)}"
