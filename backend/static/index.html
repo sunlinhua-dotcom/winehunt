@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Wine Deal Hunter — 葡萄酒捡漏助手</title>
+    <meta name="description" content="全球葡萄酒价格比对，发现有利可图的保值酒交易机会">
+    <link rel="stylesheet" href="/static/style.css">
+    <!-- Favicon -->
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%238b3a4a'><path d='M7 2v2h1v4.17L3.5 13.5c-.78.78-.78 2.05 0 2.83L7.17 20H16.83l3.67-3.67c.78-.78.78-2.05 0-2.83L16 8.17V4h1V2H7z'/></svg>">
+    <!-- Apple Touch -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0f0a0b">
+</head>
+
+<body>
+    <!-- ===== 桌面侧边栏 ===== -->
+    <nav class="sidebar" aria-label="主导航">
+        <div class="sidebar-header">
+            <div class="logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M8 22h8M12 18v4M12 2v7" />
+                    <path d="M7.5 9h9l-1 3.5c-.3 1-.8 1.9-1.5 2.6L12 17l-2-1.9A7.5 7.5 0 0 1 8.5 12.5L7.5 9z" />
+                </svg>
+                <div>
+                    <div class="logo-text">Wine Hunter</div>
+                    <div class="logo-sub">Deal Discovery Engine</div>
+                </div>
+            </div>
+        </div>
+
+        <ul class="nav-menu" role="menubar">
+            <li class="nav-item active" data-page="dashboard" role="menuitem" tabindex="0">
+                <!-- Grid/Dashboard icon -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="7" rx="1" />
+                    <rect x="14" y="3" width="7" height="7" rx="1" />
+                    <rect x="3" y="14" width="7" height="7" rx="1" />
+                    <rect x="14" y="14" width="7" height="7" rx="1" />
+                </svg>
+                <span>总览</span>
+            </li>
+            <li class="nav-item" data-page="opportunities" role="menuitem" tabindex="0">
+                <!-- TrendingUp icon -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+                    <polyline points="16 7 22 7 22 13" />
+                </svg>
+                <span>捡漏机会</span>
+            </li>
+            <li class="nav-item" data-page="search" role="menuitem" tabindex="0">
+                <!-- Search icon -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <span>搜索</span>
+            </li>
+            <li class="nav-item" data-page="watchlist" role="menuitem" tabindex="0">
+                <!-- Bookmark icon -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                </svg>
+                <span>监控酒单</span>
+            </li>
+            <li class="nav-item" data-page="wines" role="menuitem" tabindex="0">
+                <!-- Archive icon -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <rect x="2" y="3" width="20" height="5" rx="1" />
+                    <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
+                    <path d="M10 12h4" />
+                </svg>
+                <span>硬通货清单</span>
+            </li>
+            <li class="nav-item" data-page="logs" role="menuitem" tabindex="0">
+                <!-- FileText icon -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                </svg>
+                <span>扫描日志</span>
+            </li>
+        </ul>
+
+        <div class="sidebar-footer">
+            <div class="scan-indicator" id="sidebarStatus">
+                <span class="scan-dot"></span>
+                <span>待命中</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ===== 移动端底部导航 ===== -->
+    <nav class="mobile-nav" aria-label="移动导航">
+        <ul class="mobile-nav-items" role="menubar">
+            <li class="mobile-nav-item active" data-page="dashboard" role="menuitem">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="7" rx="1" />
+                    <rect x="14" y="3" width="7" height="7" rx="1" />
+                    <rect x="3" y="14" width="7" height="7" rx="1" />
+                    <rect x="14" y="14" width="7" height="7" rx="1" />
+                </svg>
+                <span>总览</span>
+            </li>
+            <li class="mobile-nav-item" data-page="opportunities" role="menuitem">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+                    <polyline points="16 7 22 7 22 13" />
+                </svg>
+                <span>捡漏</span>
+            </li>
+            <li class="mobile-nav-item" data-page="search" role="menuitem">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <span>搜索</span>
+            </li>
+            <li class="mobile-nav-item" data-page="watchlist" role="menuitem">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                </svg>
+                <span>监控</span>
+            </li>
+            <li class="mobile-nav-item" data-page="wines" role="menuitem">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <rect x="2" y="3" width="20" height="5" rx="1" />
+                    <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
+                    <path d="M10 12h4" />
+                </svg>
+                <span>清单</span>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- ===== 主内容 ===== -->
+    <main class="main">
+
+        <!-- ===== Dashboard ===== -->
+        <section class="page active" id="page-dashboard">
+            <div class="page-header">
+                <h1 class="page-title">控制台</h1>
+                <button class="btn btn-primary" id="btnScan" onclick="triggerScan()" aria-label="立即扫描">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    立即扫描
+                </button>
+            </div>
+
+            <!-- 扫描状态面板 -->
+            <div class="scan-panel" id="scanPanel">
+                <div class="scan-panel-header">
+                    <div class="scan-panel-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                        </svg>
+                        <span>正在扫描全球价格…</span>
+                    </div>
+                    <span id="scanTimer" style="font-size:0.8rem;color:var(--text-muted);">0s</span>
+                </div>
+                <div class="scan-progress">
+                    <div class="progress-bar-track">
+                        <div class="progress-bar-fill" id="scanProgressBar"></div>
+                    </div>
+                    <div class="scan-stats">
+                        <div class="scan-stat">已扫描 <strong id="scanScanned">0</strong> / <span id="scanTotal">0</span> 款
+                        </div>
+                        <div class="scan-stat">发现 <strong id="scanFound">0</strong> 条机会</div>
+                        <div class="scan-stat">错误 <strong id="scanErrors">0</strong></div>
+                    </div>
+                </div>
+                <div class="scan-log" id="scanLog"></div>
+            </div>
+
+            <!-- 统计卡 -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-label">今日发现</div>
+                    <div class="stat-value" id="todayOpps">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">累计机会</div>
+                    <div class="stat-value" id="totalOpps">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">最高利润</div>
+                    <div class="stat-value gold" id="maxProfit">—</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">最近扫描</div>
+                    <div class="stat-value" id="lastScan" style="font-size:1.1rem;">—</div>
+                </div>
+            </div>
+
+            <h2 class="section-label">最新捡漏</h2>
+            <div id="latestOpps" class="card-list">
+                <div class="empty">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M8 22h8M12 18v4M12 2v7" />
+                        <path d="M7.5 9h9l-1 3.5c-.3 1-.8 1.9-1.5 2.6L12 17l-2-1.9A7.5 7.5 0 0 1 8.5 12.5L7.5 9z" />
+                    </svg>
+                    <p>尚无捡漏机会</p>
+                    <p class="hint">点击「立即扫描」开始发现交易机会</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== 捡漏机会 ===== -->
+        <section class="page" id="page-opportunities">
+            <div class="page-header">
+                <h1 class="page-title">捡漏机会</h1>
+                <select class="select" id="profitFilter" onchange="loadOpportunities()" aria-label="利润率筛选">
+                    <option value="0">全部利润率</option>
+                    <option value="15">≥ 15%</option>
+                    <option value="20">≥ 20%</option>
+                    <option value="30">≥ 30%</option>
+                    <option value="50">≥ 50%</option>
+                </select>
+            </div>
+            <div id="oppsList" class="card-list">
+                <div class="empty">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+                    </svg>
+                    <p>暂无数据</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== 搜索 ===== -->
+        <section class="page" id="page-search">
+            <div class="page-header">
+                <h1 class="page-title">搜索</h1>
+            </div>
+            <div class="search-panel">
+                <div class="search-row">
+                    <input type="text" id="searchInput" class="input" placeholder="酒名，如 Chateau Lafite Rothschild 2018"
+                        aria-label="酒名搜索" onkeypress="if(event.key==='Enter') searchWine()">
+                    <select id="searchRegion" class="select" aria-label="产区选择">
+                        <option value="default">自动检测</option>
+                        <option value="Bordeaux">波尔多</option>
+                        <option value="Burgundy">勃艮第</option>
+                        <option value="Italy">意大利</option>
+                        <option value="Champagne">香槟</option>
+                        <option value="Rhone">罗纳河谷</option>
+                        <option value="USA">美国</option>
+                        <option value="Australia">澳洲</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="searchWine()" aria-label="搜索">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg>
+                        搜索
+                    </button>
+                </div>
+            </div>
+            <div id="searchResults"></div>
+        </section>
+
+        <!-- ===== 监控酒单 ===== -->
+        <section class="page" id="page-watchlist">
+            <div class="page-header">
+                <h1 class="page-title">监控酒单</h1>
+                <button class="btn btn-ghost" onclick="toggleWatchlistForm()" aria-label="添加酒款">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    添加
+                </button>
+            </div>
+            <div class="watchlist-form" id="watchForm">
+                <div class="search-row">
+                    <input type="text" id="watchName" class="input" placeholder="酒名" aria-label="监控酒名">
+                    <input type="number" id="watchPrice" class="input" placeholder="目标价 USD" style="max-width:160px"
+                        aria-label="目标价格">
+                    <button class="btn btn-primary" onclick="addWatchlist()">确认</button>
+                    <button class="btn btn-ghost" onclick="toggleWatchlistForm()">取消</button>
+                </div>
+            </div>
+            <div id="watchlistItems" class="card-list">
+                <div class="empty">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                    </svg>
+                    <p>监控酒单为空</p>
+                    <p class="hint">添加您关注的酒款到这里</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== 硬通货清单 ===== -->
+        <section class="page" id="page-wines">
+            <div class="page-header">
+                <h1 class="page-title">硬通货清单</h1>
+            </div>
+            <div id="winesList"></div>
+        </section>
+
+        <!-- ===== 扫描日志 ===== -->
+        <section class="page" id="page-logs">
+            <div class="page-header">
+                <h1 class="page-title">扫描日志</h1>
+            </div>
+            <div id="logsList" class="log-list"></div>
+        </section>
+    </main>
+
+    <!-- Toast -->
+    <div id="toast" class="toast" role="alert" aria-live="polite"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+
+</html>
