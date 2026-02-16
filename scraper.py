@@ -317,8 +317,13 @@ def _parse_wine_page(html: str) -> list:
             country_el = card.select_one('.country, .offer-country, [data-country]')
             country = country_el.get_text(strip=True) if country_el else ""
 
-            link_el = card.select_one('a[href]')
-            link = link_el['href'] if link_el and 'href' in link_el.attrs else ""
+            # 优先获取 wine-searcher.com 的链接（具体 listing），而非酒商主页
+            link = ""
+            for a_tag in card.select('a[href]'):
+                href = a_tag.get('href', '')
+                if 'wine-searcher.com' in href or href.startswith('/find') or href.startswith('/merchant'):
+                    link = href
+                    break
             if link and not link.startswith('http'):
                 link = BASE_URL + link
 
@@ -446,6 +451,16 @@ async def search_wine_basic(wine_name: str) -> dict:
     global_lowest = await get_global_lowest_price(wine_name)
     if not global_lowest:
         return {"wine_name": wine_name, "found": False}
+
+    # 构建 Wine-Searcher 搜索结果页 URL 作为统一直达链接
+    search_query = wine_name.replace(' ', '+')
+    ws_search_url = f"{BASE_URL}/find/{search_query}/1/a"
+
+    # 如果爬到的 url 是酒商主页（非 wine-searcher），替换为搜索页
+    if global_lowest.get("url") and 'wine-searcher.com' not in global_lowest["url"]:
+        global_lowest["url"] = ws_search_url
+    elif not global_lowest.get("url"):
+        global_lowest["url"] = ws_search_url
 
     await _random_delay(3, 6)
 
