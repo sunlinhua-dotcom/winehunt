@@ -147,6 +147,18 @@ async def api_stats():
     stats = await get_stats()
     stats["scanning"] = is_scanning()
     stats["premium_wines_count"] = len(ALL_WINES)
+
+    # 获取实时汇率 (USD -> CNY)
+    try:
+        from exchange_rates import get_exchange_rates
+        rates = await get_exchange_rates()
+        # rates['CNY'] 是 1 CNY = ? USD，所以 USD->CNY 是其倒数
+        cny_rate_val = rates.get('CNY', 0.14)
+        usd_to_cny = 1.0 / cny_rate_val if cny_rate_val > 0 else 7.14
+    except Exception:
+        usd_to_cny = 7.14  # 兜底汇率
+    stats["usd_to_cny"] = round(usd_to_cny, 2)
+
     return stats
 
 
@@ -320,8 +332,11 @@ async def admin_reset_db():
         await db.close()
         
         # 清除内存缓存
-        if hasattr(scanner, '_scan_cache'):
-            scanner._scan_cache.clear()
+        try:
+            from scanner import _scan_cache
+            _scan_cache.clear()
+        except (ImportError, AttributeError):
+            pass
             
         logger.warning("⚠️ 数据库已通过 /api/admin/reset 手动清空")
         return {"status": "ok", "message": "数据库已清空，请点击'立即扫描'重新采集数据"}
