@@ -102,26 +102,32 @@ function renderDealCard(op) {
                                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
                                 <circle cx="12" cy="10" r="3"/>
                             </svg>
-                            ${escHtml(op.source_region || '—')}
+                            ${escHtml(op.buy_country || op.region || '—')}
                         </span>
                         <span class="deal-meta-item">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
                             </svg>
-                            买入 <strong>$${(op.source_price || 0).toFixed(0)}</strong>
+                            买入 <strong>$${(op.buy_price || 0).toFixed(0)}</strong>
                         </span>
                         <span class="deal-meta-item">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
                             </svg>
-                            港卖 <strong>$${(op.hk_price || 0).toFixed(0)}</strong>
+                            港卖 <strong>$${(op.sell_price_hk || 0).toFixed(0)}</strong>
                         </span>
                     </div>
                     <div class="deal-badges">
                         <span class="badge badge-profit ${profitClass}">利润 ${op.profit_rate?.toFixed(1)}%</span>
-                        ${op.source_region ? `<span class="badge badge-region">${escHtml(op.source_region)}</span>` : ''}
+                        ${op.buy_merchant ? `<span class="badge badge-region" title="酒商">${escHtml(op.buy_merchant)}</span>` : ''}
                         ${op.score ? `<span class="badge badge-score">评分 ${op.score}</span>` : ''}
                     </div>
+                    ${op.buy_url ? `
+                    <div style="margin-top:8px;">
+                        <a href="${escHtml(op.buy_url)}" target="_blank" rel="noopener" class="btn btn-sm btn-primary" style="padding:4px 12px;font-size:12px;">
+                            直达链接 &rarr;
+                        </a>
+                    </div>` : ''}
                 </div>
                 <div class="deal-right">
                     <div class="deal-profit ${profitClass}">+${op.profit_rate?.toFixed(1)}%</div>
