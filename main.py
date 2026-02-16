@@ -42,7 +42,7 @@ _scheduler_task = None
 
 async def scheduled_scan():
     """定时扫描任务"""
-    interval = int(os.getenv("SCAN_INTERVAL_MINUTES", "30"))
+    interval = int(os.getenv("SCAN_INTERVAL_MINUTES", "480"))
     threshold = float(os.getenv("PROFIT_THRESHOLD", "15"))
 
     while True:

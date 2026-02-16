@@ -11,6 +11,7 @@ import json
 import logging
 from typing import Optional
 from bs4 import BeautifulSoup
+from exchange_rates import get_cached_rate, to_usd_sync, FALLBACK_RATES as EXCHANGE_RATES
 
 logger = logging.getLogger(__name__)
 
@@ -203,7 +204,7 @@ async def _smart_fetch(url: str) -> Optional[str]:
         return html
 
     # 引擎 2: curl_cffi（IP 未封时有效）
-    html = await _fetch_with_curl_cffi(url, max_retries=1)
+    html = await _fetch_with_curl_cffi(url, max_retries=2)
     if html:
         return html
 
@@ -274,7 +275,6 @@ def _detect_currency(price_text: str) -> str:
 
 
 # ── 汇率（使用实时汇率模块，带兜底）──────
-from exchange_rates import get_cached_rate, to_usd_sync, FALLBACK_RATES as EXCHANGE_RATES
 
 
 def _to_usd(price: float, currency: str) -> float:
