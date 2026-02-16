@@ -126,7 +126,7 @@ async def _fetch_with_curl_cffi(url: str, max_retries: int = 3) -> Optional[str]
     return None
 
 
-# ── 引擎 1: ScraperAPI（主引擎，代理 IP 绕过封锁）────
+# ── 引擎 2: ScraperAPI（备用，仅 curl_cffi 失败时使用）────
 async def _fetch_with_scraper_api(url: str) -> Optional[str]:
     """
     使用 ScraperAPI 免费层（5000 次/月）
