@@ -7,7 +7,9 @@ import os
 import json
 from datetime import datetime
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "wine_deals.db")
+# 优先从环境变量读取 DB_PATH，方便本地调试和 Zeabur 持久化挂载
+DB_PATH = os.getenv("DB_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "wine_deals.db"))
+print(f"DEBUG: DB_PATH is {DB_PATH}")
 
 
 async def get_db():
