@@ -273,7 +273,7 @@ def _to_usd(price: float, currency: str) -> float:
 def _parse_wine_page(html: str) -> list:
     """解析 Wine-Searcher 搜索结果页"""
     results = []
-    soup = BeautifulSoup(html, 'lxml')
+    soup = BeautifulSoup(html, 'html.parser')
 
     # 方法1: 标准 offer 卡片选择器
     offer_cards = soup.select('.card__offer, .offer-row, .result-row, [data-offer]')

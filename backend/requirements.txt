@@ -5,5 +5,5 @@ beautifulsoup4==4.12.3
 apscheduler==3.10.4
 python-telegram-bot==21.5
 python-dotenv==1.0.1
-lxml==5.2.0
+
 aiosqlite==0.20.0
