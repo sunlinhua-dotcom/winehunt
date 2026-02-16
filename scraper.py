@@ -245,32 +245,54 @@ def _parse_price(price_text: str) -> Optional[float]:
         return None
 
 
-def _detect_currency(price_text: str) -> str:
-    """检测价格文本中的货币类型（注意检测顺序：特殊符号优先于通用符号）"""
-    text_upper = price_text.upper()
-    # 先检测带前缀的特殊货币（必须在通用 $ 之前）
-    if 'HK$' in price_text or 'HKD' in text_upper:
-        return 'HKD'
-    if 'CA$' in price_text or 'CAD' in text_upper:
-        return 'CAD'
-    if 'NZ$' in price_text or 'NZD' in text_upper:
-        return 'NZD'
-    if 'AU$' in price_text or 'A$' in price_text or 'AUD' in text_upper:
-        return 'AUD'
-    # 通用货币符号
-    if '€' in price_text or 'EUR' in text_upper:
-        return 'EUR'
-    if '£' in price_text or 'GBP' in text_upper:
-        return 'GBP'
-    if '¥' in price_text or 'CNY' in text_upper or 'RMB' in text_upper:
-        return 'CNY'
-    if 'CHF' in text_upper:
-        return 'CHF'
-    if '¥' in price_text or 'JPY' in text_upper:
-        return 'JPY'
-    # 最后才匹配通用 $（默认为 USD）
-    if '$' in price_text or 'USD' in text_upper:
-        return 'USD'
+def _detect_currency(price_text: str, country: str = "") -> str:
+    """
+    检测价格文本中的货币类型
+    :param price_text: 价格字符串 (e.g. "HK$ 1,200")
+    :param country: 国家名称 (e.g. "Hong Kong")，用于辅助消除歧义
+    """
+    text = price_text.upper()
+    country = country.upper()
+
+    # 1. 明确的 ISO 代码
+    for code in ['USD', 'EUR', 'GBP', 'HKD', 'CNY', 'JPY', 'AUD', 'CAD', 'NZD', 'SGD', 'CHF', 'ZAR', 'KRW']:
+        if code in text:
+            return code
+
+    # 2. 强前缀符号
+    if 'HK$' in text: return 'HKD'
+    if 'CA$' in text: return 'CAD'
+    if 'NZ$' in text: return 'NZD'
+    if 'AU$' in text or 'A$' in text: return 'AUD'
+    if 'SG$' in text or 'S$' in text: return 'SGD'
+    if 'NT$' in text: return 'TWD'
+    
+    # 3. 特殊符号
+    if '€' in text: return 'EUR'
+    if '£' in text: return 'GBP'
+    if 'CHF' in text: return 'CHF'
+    if 'R' in text and any(c.isdigit() for c in price_text.split('R')[-1]): # R后跟数字
+        return 'ZAR'
+    if '₩' in text or 'WON' in text: return 'KRW'
+    
+    # 4. 歧义符号处理
+    
+    # ¥: JPY vs CNY
+    if '¥' in text:
+        if 'CHINA' in country or 'CN' in text: return 'CNY'
+        return 'JPY' # 默认 ¥ 为日元（国际惯例）
+
+    # $: USD vs Others (Based on Country)
+    if '$' in text:
+        if 'HONG KONG' in country or 'HK' == country: return 'HKD'
+        if 'AUSTRALIA' in country: return 'AUD'
+        if 'CANADA' in country: return 'CAD'
+        if 'NEW ZEALAND' in country: return 'NZD'
+        if 'SINGAPORE' in country: return 'SGD'
+        if 'TAIWAN' in country: return 'TWD'
+        return 'USD' # 默认 $ 为美元
+
+    # 5. 无法识别，默认 USD
     return 'USD'
 
 
@@ -325,10 +347,11 @@ def _parse_wine_page(html: str) -> list:
             if not price or price < 20:
                 continue
 
-            currency = _detect_currency(price_text)
 
             country_el = card.select_one('.country, .offer-country, [data-country]')
             country = country_el.get_text(strip=True) if country_el else ""
+
+            currency = _detect_currency(price_text, country)
 
             # 优先获取 wine-searcher.com 的链接（具体 listing），而非酒商主页
             link = ""
@@ -392,7 +415,7 @@ def _parse_wine_page(html: str) -> list:
                     "merchant": "Wine-Searcher",
                     "price": price,
                     "price_usd": price,
-                    "currency": "USD",
+                    "currency": _detect_currency(str(price), ""),
                     "country": "",
                     "url": "",
                 })
