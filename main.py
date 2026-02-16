@@ -306,6 +306,29 @@ async def api_remove_watchlist(item_id: int):
     return {"status": "removed"}
 
 
+
+@app.get("/api/admin/reset")
+async def admin_reset_db():
+    """【紧急修复】手动触发数据库重置，清理旧的错误数据"""
+    try:
+        from database import get_db
+        db = await get_db()
+        await db.execute("DELETE FROM opportunities")
+        await db.execute("DELETE FROM price_history")
+        await db.execute("DELETE FROM scan_logs")
+        await db.commit()
+        await db.close()
+        
+        # 清除内存缓存
+        if hasattr(scanner, '_scan_cache'):
+            scanner._scan_cache.clear()
+            
+        logger.warning("⚠️ 数据库已通过 /api/admin/reset 手动清空")
+        return {"status": "ok", "message": "数据库已清空，请点击'立即扫描'重新采集数据"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", os.getenv("BACKEND_PORT", "8080")))
