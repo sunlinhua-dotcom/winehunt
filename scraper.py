@@ -275,10 +275,20 @@ def _parse_wine_page(html: str) -> list:
     results = []
     soup = BeautifulSoup(html, 'html.parser')
 
-    # 方法1: 标准 offer 卡片选择器
-    offer_cards = soup.select('.card__offer, .offer-row, .result-row, [data-offer]')
-    if not offer_cards:
-        offer_cards = soup.select('tr.offer, .search-result-item')
+    # 方法1: 优先尝试多种 CSS 选择器（Wine-Searcher 页面结构可能变化）
+    selectors = [
+        '.card__offer', '.offer-row', '.result-row', '[data-offer]',
+        'tr.offer', '.search-result-item',
+        '.wine-card', '.listing-row', '.price-listing',
+        'div[class*="offer"]', 'div[class*="listing"]',
+        'tr[class*="offer"]', 'tr[class*="result"]',
+    ]
+    offer_cards = []
+    for sel in selectors:
+        offer_cards = soup.select(sel)
+        if offer_cards:
+            logger.debug(f"HTML 解析命中选择器: {sel} ({len(offer_cards)} 条)")
+            break
 
     for card in offer_cards[:20]:
         try:

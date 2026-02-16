@@ -89,25 +89,52 @@ async def init_db():
 
 
 async def save_opportunity(opp: dict) -> int:
-    """保存一条捡漏机会"""
+    """保存一条捡漏机会（同酒名去重：更新已有记录或新增）"""
     db = await get_db()
     try:
+        # 先查是否已有同酒名的 active 记录
         cursor = await db.execute(
-            """INSERT INTO opportunities
-            (wine_name, vintage, region, category, buy_price, buy_currency,
-             buy_merchant, buy_country, buy_url, sell_price_hk, total_cost,
-             profit_rate, score, data_source)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                opp["wine_name"], opp.get("vintage"), opp.get("region"),
-                opp.get("category"), opp["buy_price"], opp.get("buy_currency", "USD"),
-                opp.get("buy_merchant"), opp.get("buy_country"), opp.get("buy_url"),
-                opp.get("sell_price_hk"), opp.get("total_cost"),
-                opp.get("profit_rate"), opp.get("score"), opp.get("data_source", "wine-searcher")
-            )
+            "SELECT id FROM opportunities WHERE wine_name = ? AND status = 'active'",
+            (opp["wine_name"],)
         )
-        await db.commit()
-        return cursor.lastrowid
+        existing = await cursor.fetchone()
+
+        if existing:
+            # 更新已有记录
+            await db.execute(
+                """UPDATE opportunities SET
+                    buy_price=?, buy_currency=?, buy_merchant=?, buy_country=?,
+                    buy_url=?, sell_price_hk=?, total_cost=?, profit_rate=?,
+                    score=?, data_source=?, created_at=CURRENT_TIMESTAMP
+                WHERE id=?""",
+                (
+                    opp["buy_price"], opp.get("buy_currency", "USD"),
+                    opp.get("buy_merchant"), opp.get("buy_country"), opp.get("buy_url"),
+                    opp.get("sell_price_hk"), opp.get("total_cost"),
+                    opp.get("profit_rate"), opp.get("score"),
+                    opp.get("data_source", "wine-searcher"), existing["id"]
+                )
+            )
+            await db.commit()
+            return existing["id"]
+        else:
+            # 新增记录
+            cursor = await db.execute(
+                """INSERT INTO opportunities
+                (wine_name, vintage, region, category, buy_price, buy_currency,
+                 buy_merchant, buy_country, buy_url, sell_price_hk, total_cost,
+                 profit_rate, score, data_source)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    opp["wine_name"], opp.get("vintage"), opp.get("region"),
+                    opp.get("category"), opp["buy_price"], opp.get("buy_currency", "USD"),
+                    opp.get("buy_merchant"), opp.get("buy_country"), opp.get("buy_url"),
+                    opp.get("sell_price_hk"), opp.get("total_cost"),
+                    opp.get("profit_rate"), opp.get("score"), opp.get("data_source", "wine-searcher")
+                )
+            )
+            await db.commit()
+            return cursor.lastrowid
     finally:
         await db.close()
 
@@ -168,7 +195,23 @@ async def get_scan_logs(limit: int = 20):
             "SELECT * FROM scan_logs ORDER BY finished_at DESC LIMIT ?", (limit,)
         )
         rows = await cursor.fetchall()
-        return [dict(row) for row in rows]
+        logs = []
+        for row in rows:
+            d = dict(row)
+            # 格式化耗时供前端显示
+            secs = d.get("duration_seconds")
+            if secs and secs > 0:
+                mins = int(secs // 60)
+                remaining = int(secs % 60)
+                d["duration"] = f"{mins}m {remaining}s" if mins else f"{remaining}s"
+            else:
+                d["duration"] = "—"
+            # 兼容前端字段名
+            d["scanned"] = d.get("wines_scanned", 0)
+            d["found"] = d.get("opportunities_found", 0)
+            d["scan_time"] = d.get("finished_at")
+            logs.append(d)
+        return logs
     finally:
         await db.close()
 

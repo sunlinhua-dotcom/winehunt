@@ -164,7 +164,7 @@ async def api_opportunity_detail(opp_id: int):
 
 @app.post("/api/search")
 async def api_search(req: SearchRequest):
-    """手动搜索一款酒（不受后台扫描影响）"""
+    """手动搜索一款酒（复用 analyzer 校验逻辑）"""
 
     result = await run_single_scan(
         wine_name=req.wine_name,
@@ -173,32 +173,46 @@ async def api_search(req: SearchRequest):
         profit_threshold=req.profit_threshold
     )
 
-    # 扁平化返回，方便前端直接渲染
     gl = result.get("global_lowest") or {}
-    hk = result.get("hk_avg_price") or result.get("hk_avg_price_usd")
-    opp = result.get("opportunity") or {}
+    opp = result.get("opportunity")  # analyzer 已校验过的结果
 
+    # 如果 analyzer 通过校验且返回了 opportunity，直接使用其数据
+    if opp:
+        return {
+            "wine_name": opp.get("wine_name", req.wine_name),
+            "found": True,
+            "global_lowest": opp.get("buy_price", 0),
+            "hk_average": opp.get("sell_price_hk", 0),
+            "total_cost": opp.get("total_cost", 0),
+            "profit_rate": opp.get("profit_rate", 0),
+            "source_region": opp.get("buy_country", ""),
+            "source_merchant": opp.get("buy_merchant", ""),
+            "shipping_cost": opp.get("shipping_cost", 0),
+            "buy_url": opp.get("buy_url", ""),
+        }
+
+    # analyzer 未通过校验（数据异常或利润率不达标），返回原始数据供参考
     buy_price = gl.get("price_usd", 0) if isinstance(gl, dict) else 0
-    hk_price = hk if isinstance(hk, (int, float)) else 0
+    hk_price = result.get("hk_avg_price") or 0
 
-    from wine_list import calculate_total_cost
+    from wine_list import calculate_total_cost, get_shipping_cost
     region = req.region or "default"
     total_cost = calculate_total_cost(buy_price, region) if buy_price else 0
     profit_rate = ((hk_price - total_cost) / total_cost * 100) if total_cost and hk_price else 0
-
-    from wine_list import get_shipping_cost
-    shipping = get_shipping_cost(region)
+    # 再次校验合理性上限
+    if profit_rate > 500:
+        profit_rate = 0  # 标记为异常
 
     return {
         "wine_name": result.get("wine_name", req.wine_name),
         "found": result.get("found", False),
         "global_lowest": buy_price,
-        "hk_average": hk_price,
+        "hk_average": hk_price if isinstance(hk_price, (int, float)) else 0,
         "total_cost": total_cost,
         "profit_rate": round(profit_rate, 2),
         "source_region": gl.get("country", "") if isinstance(gl, dict) else "",
         "source_merchant": gl.get("merchant", "") if isinstance(gl, dict) else "",
-        "shipping_cost": shipping,
+        "shipping_cost": get_shipping_cost(region),
         "buy_url": gl.get("url", "") if isinstance(gl, dict) else "",
     }
 
