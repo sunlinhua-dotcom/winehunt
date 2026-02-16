@@ -36,8 +36,28 @@ def analyze_opportunity(wine_info: dict, wine_config: dict, profit_threshold: fl
     if not hk_avg or hk_avg <= 0 or buy_price <= 0:
         return None
 
+    # 合理性校验：单瓶酒价格应在 $10-$20000 范围内
+    if buy_price < 10 or buy_price > 20000:
+        logger.warning(f"⚠️ 买入价异常 ({wine_config['name']}): ${buy_price:.2f}，跳过")
+        return None
+    if hk_avg < 10 or hk_avg > 50000:
+        logger.warning(f"⚠️ 港卖价异常 ({wine_config['name']}): ${hk_avg:.2f}，跳过")
+        return None
+
+    # 港卖价不应超过买入价 10 倍（极端异常）
+    if hk_avg > buy_price * 10:
+        logger.warning(
+            f"⚠️ 价差异常 ({wine_config['name']}): 买${buy_price:.0f} 卖${hk_avg:.0f}，跳过"
+        )
+        return None
+
     region = wine_config.get("region", "default")
     profit_rate = calculate_profit_rate(buy_price, hk_avg, region, is_case=True)
+
+    # 利润率上限 500%，超过视为数据错误
+    if profit_rate > 500:
+        logger.warning(f"⚠️ 利润率异常 ({wine_config['name']}): {profit_rate:.1f}%，跳过")
+        return None
 
     if profit_rate < profit_threshold:
         return None

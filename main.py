@@ -64,6 +64,17 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info("✅ 数据库初始化完成")
 
+    # 清理历史脏数据（利润率异常或价格为零的记录）
+    try:
+        from database import get_db
+        db = await get_db()
+        await db.execute("DELETE FROM opportunities WHERE profit_rate > 500 OR buy_price <= 0 OR sell_price_hk <= 0")
+        await db.commit()
+        await db.close()
+        logger.info("✅ 已清理异常数据")
+    except Exception as e:
+        logger.warning(f"清理脏数据时出错: {e}")
+
     # 启动定时扫描
     _scheduler_task = asyncio.create_task(scheduled_scan())
     logger.info("✅ 定时扫描任务已启动")

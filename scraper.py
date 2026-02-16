@@ -352,13 +352,14 @@ def _parse_wine_page(html: str) -> list:
             except Exception:
                 continue
 
-    # 方法3: 简单价格提取（fallback）
+    # 方法3: 简单价格提取（fallback）— 严格限制范围
     if not results:
         # 尝试从页面中直接提取价格数字
         price_patterns = soup.find_all(string=re.compile(r'\$[\d,]+\.?\d*'))
         for pt in price_patterns[:5]:
             price = _parse_price(pt)
-            if price and 10 < price < 50000:
+            # 严格限制：单瓶葡萄酒价格通常在 $20-$15000 之间
+            if price and 20 < price < 15000:
                 results.append({
                     "merchant": "Wine-Searcher",
                     "price": price,
@@ -385,7 +386,18 @@ async def search_wine_prices(wine_name: str, country_filter: str = None) -> list
     if not html:
         return []
 
-    return _parse_wine_page(html)
+    results = _parse_wine_page(html)
+
+    # 如果是香港页面，强制将未标注 HKD 的 $ 价格视为 HKD
+    if country_filter and 'hong' in country_filter.lower():
+        for r in results:
+            if r['currency'] == 'USD':
+                # Wine-Searcher 香港页面默认显示 HKD，即使符号是 $
+                r['currency'] = 'HKD'
+                r['price_usd'] = _to_usd(r['price'], 'HKD')
+                logger.debug(f"香港页面货币修正: ${r['price']:.0f} HKD -> ${r['price_usd']:.2f} USD")
+
+    return results
 
 
 async def get_global_lowest_price(wine_name: str) -> Optional[dict]:
@@ -398,7 +410,7 @@ async def get_global_lowest_price(wine_name: str) -> Optional[dict]:
 
 
 async def get_hk_average_price(wine_name: str) -> Optional[float]:
-    """获取香港市场均价"""
+    """获取香港市场均价（含异常值过滤）"""
     results = await search_wine_prices(wine_name, country_filter="hong+kong")
     if not results:
         return None
@@ -407,7 +419,16 @@ async def get_hk_average_price(wine_name: str) -> Optional[float]:
     if not usd_prices:
         return None
 
-    return sum(usd_prices) / len(usd_prices)
+    # 异常值过滤：去掉偏离中位数 5 倍以上的值
+    usd_prices.sort()
+    median = usd_prices[len(usd_prices) // 2]
+    filtered = [p for p in usd_prices if p < median * 5 and p > median * 0.2]
+    if not filtered:
+        filtered = usd_prices  # 过滤失败则回退
+
+    avg = sum(filtered) / len(filtered)
+    logger.info(f"香港均价 ({wine_name}): ${avg:.2f} USD (样本 {len(filtered)} 条, 中位 ${median:.2f})")
+    return avg
 
 
 async def search_wine_basic(wine_name: str) -> dict:
