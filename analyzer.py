@@ -38,16 +38,16 @@ def analyze_opportunity(wine_info: dict, wine_config: dict, profit_threshold: fl
 
     # 合理性校验：单瓶酒价格应在 $10-$20000 范围内
     if buy_price < 10 or buy_price > 20000:
-        logger.warning(f"⚠️ 买入价异常 ({wine_config['name']}): ${buy_price:.2f}，跳过")
+        logger.warning(f"⚠️ 买入价异常 ({wine_config['name']}): {buy_price:.2f} USD，跳过")
         return None
     if hk_avg < 10 or hk_avg > 50000:
-        logger.warning(f"⚠️ 港卖价异常 ({wine_config['name']}): ${hk_avg:.2f}，跳过")
+        logger.warning(f"⚠️ 港卖价异常 ({wine_config['name']}): {hk_avg:.2f} USD，跳过")
         return None
 
     # 港卖价不应超过买入价 10 倍（极端异常）
     if hk_avg > buy_price * 10:
         logger.warning(
-            f"⚠️ 价差异常 ({wine_config['name']}): 买${buy_price:.0f} 卖${hk_avg:.0f}，跳过"
+            f"⚠️ 价差异常 ({wine_config['name']}): 买{buy_price:.0f} USD 卖{hk_avg:.0f} USD，跳过"
         )
         return None
 
@@ -87,7 +87,7 @@ def analyze_opportunity(wine_info: dict, wine_config: dict, profit_threshold: fl
 
     logger.info(
         f"🍷 发现捡漏: {wine_config['name']} | "
-        f"买入: ${buy_price:.0f} | 卖出: ${hk_avg:.0f} | "
+        f"买入: {buy_price:.0f} USD | 卖出: {hk_avg:.0f} USD | "
         f"利润率: {profit_rate:.1f}% | 评分: {score}/10"
     )
 
