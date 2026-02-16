@@ -26,7 +26,7 @@ from database import (
     add_to_watchlist, get_watchlist, remove_from_watchlist
 )
 from scanner import run_full_scan, run_single_scan, is_scanning, get_scan_progress
-from wine_list import PREMIUM_WINES
+from wine_list import PREMIUM_WINES, ALL_WINES
 
 # 日志配置
 logging.basicConfig(
@@ -63,6 +63,14 @@ async def lifespan(app: FastAPI):
     # 启动时初始化数据库
     await init_db()
     logger.info("✅ 数据库初始化完成")
+
+    # 预热实时汇率缓存
+    try:
+        from exchange_rates import get_exchange_rates
+        rates = await get_exchange_rates()
+        logger.info(f"✅ 实时汇率预热完成 (EUR={rates.get('EUR', 0):.4f}, HKD={rates.get('HKD', 0):.4f})")
+    except Exception as e:
+        logger.warning(f"汇率预热失败（将使用兜底汇率）: {e}")
 
     # 清理历史脏数据（利润率异常或价格为零的记录）
     try:
@@ -259,15 +267,15 @@ async def api_price_history(wine_name: str, limit: int = Query(100, ge=1, le=500
 
 @app.get("/api/wines")
 async def api_wines():
-    """获取保值酒清单"""
+    """获取保值酒清单（展示全部 50 款，含核心 + 备选）"""
     # 按分类分组
     categories = {}
-    for wine in PREMIUM_WINES:
+    for wine in ALL_WINES:
         cat = wine.get("category", "其他")
         if cat not in categories:
             categories[cat] = []
         categories[cat].append(wine)
-    return {"total": len(PREMIUM_WINES), "categories": categories}
+    return {"total": len(ALL_WINES), "categories": categories}
 
 
 # ===== 监控酒单 =====

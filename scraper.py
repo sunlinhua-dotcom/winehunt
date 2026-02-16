@@ -273,15 +273,13 @@ def _detect_currency(price_text: str) -> str:
     return 'USD'
 
 
-EXCHANGE_RATES = {
-    'USD': 1.0, 'EUR': 1.08, 'GBP': 1.27,
-    'HKD': 0.128, 'CNY': 0.14, 'AUD': 0.65,
-    'JPY': 0.0067, 'CHF': 1.12,
-}
+# ── 汇率（使用实时汇率模块，带兜底）──────
+from exchange_rates import get_cached_rate, to_usd_sync, FALLBACK_RATES as EXCHANGE_RATES
 
 
 def _to_usd(price: float, currency: str) -> float:
-    return price * EXCHANGE_RATES.get(currency, 1.0)
+    """将任意货币转换为 USD（同步版本，使用缓存或兜底汇率）"""
+    return to_usd_sync(price, currency)
 
 
 # ── 页面解析 ─────────────────────────────

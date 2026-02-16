@@ -1,10 +1,11 @@
 """
 定时扫描模块
-每30分钟自动扫描保值酒清单，发现捡漏机会
+自动扫描保值酒清单，发现捡漏机会
+智能缓存：24小时内已扫描且无机会的酒款跳过，大幅节省 API 额度
 """
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from wine_list import PREMIUM_WINES
 from scraper import search_wine_basic
 from analyzer import analyze_opportunity
@@ -25,6 +26,24 @@ _scan_progress = {
     "current_wine": "",
 }
 
+# ── 智能缓存：记录每款酒的最后扫描时间和结果 ──
+_scan_cache: dict = {}  # key=wine_name, value={"time": datetime, "had_opportunity": bool}
+CACHE_TTL = timedelta(hours=24)  # 无机会的酒款 24 小时跳过
+
+
+def _should_skip_wine(wine_name: str) -> bool:
+    """智能判断是否跳过某款酒（24h 内已扫描且无机会则跳过）"""
+    if wine_name not in _scan_cache:
+        return False
+    cache = _scan_cache[wine_name]
+    # 如果上次有机会，始终重扫（追踪价格变化）
+    if cache.get("had_opportunity"):
+        return False
+    # 如果 24h 内扫过且没机会，跳过
+    if datetime.now() - cache["time"] < CACHE_TTL:
+        return True
+    return False
+
 
 def is_scanning() -> bool:
     return _scan_running
@@ -42,6 +61,7 @@ async def run_full_scan(profit_threshold: float = 15, notify: bool = True) -> di
     """
     执行一次完整扫描
     遍历保值酒清单 → 爬取价格 → 分析利润 → 保存+通知
+    智能缓存: 24h 内无机会的酒款自动跳过
     """
     global _scan_running, _last_scan_result
 
@@ -49,10 +69,18 @@ async def run_full_scan(profit_threshold: float = 15, notify: bool = True) -> di
         logger.warning("扫描已在进行中，跳过本次")
         return {"status": "skipped", "reason": "scan_in_progress"}
 
+    # 预热汇率缓存
+    try:
+        from exchange_rates import get_exchange_rates
+        await get_exchange_rates()
+    except Exception:
+        pass
+
     _scan_running = True
     started_at = datetime.now()
     wines_scanned = 0
     opportunities_found = 0
+    skipped = 0
     errors = []
     found_opportunities = []
     total = len(PREMIUM_WINES)
@@ -73,13 +101,22 @@ async def run_full_scan(profit_threshold: float = 15, notify: bool = True) -> di
             wine_name = wine_config["name"]
             _scan_progress["current_wine"] = wine_name
 
+            # ── 智能缓存检查 ──
+            if _should_skip_wine(wine_name):
+                skipped += 1
+                _scan_progress["scanned"] = wines_scanned + skipped
+                logger.debug(f"⏭️ 跳过 (24h缓存): {wine_name}")
+                continue
+
             try:
                 # 1. 爬取价格数据
                 wine_info = await search_wine_basic(wine_name)
                 wines_scanned += 1
-                _scan_progress["scanned"] = wines_scanned
+                _scan_progress["scanned"] = wines_scanned + skipped
 
                 if not wine_info.get("found"):
+                    # 记录缓存：没找到数据也算无机会
+                    _scan_cache[wine_name] = {"time": datetime.now(), "had_opportunity": False}
                     logger.debug(f"未找到数据: {wine_name}")
                     continue
 
@@ -112,9 +149,15 @@ async def run_full_scan(profit_threshold: float = 15, notify: bool = True) -> di
                     opportunities_found += 1
                     _scan_progress["found"] = opportunities_found
 
+                    # 记录缓存：有机会
+                    _scan_cache[wine_name] = {"time": datetime.now(), "had_opportunity": True}
+
                     # 发送 Telegram 通知
                     if notify:
                         await notify_opportunity(opp)
+                else:
+                    # 记录缓存：无机会
+                    _scan_cache[wine_name] = {"time": datetime.now(), "had_opportunity": False}
 
             except Exception as e:
                 error_msg = f"{wine_name}: {str(e)}"
@@ -137,6 +180,7 @@ async def run_full_scan(profit_threshold: float = 15, notify: bool = True) -> di
         result = {
             "status": "completed",
             "wines_scanned": wines_scanned,
+            "wines_skipped": skipped,
             "opportunities_found": opportunities_found,
             "errors_count": len(errors),
             "duration_seconds": round(duration, 1),
@@ -145,7 +189,7 @@ async def run_full_scan(profit_threshold: float = 15, notify: bool = True) -> di
 
         _last_scan_result = result
         logger.info(
-            f"✅ 扫描完成: {wines_scanned} 款酒, "
+            f"✅ 扫描完成: {wines_scanned} 款酒 (跳过 {skipped} 款), "
             f"发现 {opportunities_found} 条机会, "
             f"耗时 {duration:.1f}s"
         )
@@ -161,7 +205,7 @@ async def run_full_scan(profit_threshold: float = 15, notify: bool = True) -> di
 async def run_single_scan(wine_name: str, region: str = "default",
                           category: str = "", profit_threshold: float = 15) -> dict:
     """
-    扫描单款酒（手动搜索用）
+    扫描单款酒（手动搜索用，不受缓存限制）
     """
     wine_config = {
         "name": wine_name,
