@@ -56,6 +56,9 @@ async function loadDashboard() {
             maxEl.textContent = '—';
         }
 
+        // Global rate
+        window.usdToCny = data.usd_to_cny || 7.2;
+
         const lastScanEl = document.getElementById('lastScan');
         const lastScanValue = data.last_scan_time || data.last_scan;
         if (lastScanValue) {
@@ -71,6 +74,15 @@ async function loadDashboard() {
     } catch (e) {
         console.warn('Dashboard load error:', e);
     }
+}
+
+// 核心：价格格式化 (USD -> CNY)
+function formatPrice(usdPrice) {
+    if (usdPrice === null || usdPrice === undefined) return '—';
+    const rate = window.usdToCny || 7.2;
+    const cnyPrice = usdPrice * rate;
+    // 取整显示，更符合人民币习惯（或者保留一位小数）
+    return '¥' + Math.round(cnyPrice).toLocaleString();
 }
 
 function renderLatestOpps(opps) {
@@ -109,13 +121,13 @@ function renderDealCard(op) {
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
                             </svg>
-                            买入 <strong>$${(op.buy_price || 0).toFixed(0)}</strong>
+                            买入 <strong>${formatPrice(op.buy_price)}</strong>
                         </span>
                         <span class="deal-meta-item">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
                             </svg>
-                            港卖 <strong>$${(op.sell_price_hk || 0).toFixed(0)}</strong>
+                            港卖 <strong>${formatPrice(op.sell_price_hk)}</strong>
                         </span>
                     </div>
                     <div class="deal-badges">
@@ -360,15 +372,15 @@ function renderSearchResult(container, data) {
             <div class="result-grid">
                 <div class="result-item">
                     <span class="result-label">全球最低价</span>
-                    <span class="result-value">$${(data.global_lowest || 0).toFixed(2)}</span>
+                    <span class="result-value">${formatPrice(data.global_lowest)}</span>
                 </div>
                 <div class="result-item">
                     <span class="result-label">香港均价</span>
-                    <span class="result-value">${data.hk_average ? '$' + data.hk_average.toFixed(2) : '暂无数据'}</span>
+                    <span class="result-value">${data.hk_average ? formatPrice(data.hk_average) : '暂无数据'}</span>
                 </div>
                 <div class="result-item">
                     <span class="result-label">总采购成本</span>
-                    <span class="result-value">$${(data.total_cost || 0).toFixed(2)}</span>
+                    <span class="result-value">${formatPrice(data.total_cost)}</span>
                 </div>
                 <div class="result-item">
                     <span class="result-label">利润率</span>
@@ -376,7 +388,7 @@ function renderSearchResult(container, data) {
                 </div>
                 ${data.source_region ? `<div class="result-item"><span class="result-label">来源国家</span><span class="result-value">${escHtml(data.source_region)}</span></div>` : ''}
                 ${data.source_merchant ? `<div class="result-item"><span class="result-label">最低价酒商</span><span class="result-value">${escHtml(data.source_merchant)}</span></div>` : ''}
-                ${data.shipping_cost ? `<div class="result-item"><span class="result-label">运费/瓶</span><span class="result-value">$${data.shipping_cost.toFixed(2)}</span></div>` : ''}
+                ${data.shipping_cost ? `<div class="result-item"><span class="result-label">运费/瓶</span><span class="result-value">${formatPrice(data.shipping_cost)}</span></div>` : ''}
             </div>
             ${data.buy_url ? `<div style="margin-top:12px;text-align:center"><a href="${escHtml(data.buy_url)}" target="_blank" rel="noopener" class="btn btn-primary" style="display:inline-flex;gap:6px;align-items:center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>查看酒商</a></div>` : ''}
         </div>`;
@@ -452,7 +464,7 @@ async function loadWatchlist() {
                     <div class="deal-info">
                         <div class="deal-name">${escHtml(item.wine_name)}</div>
                         <div class="deal-meta">
-                            ${item.target_price ? `<span class="deal-meta-item">目标 <strong>$${item.target_price}</strong></span>` : ''}
+                            ${item.target_price ? `<span class="deal-meta-item">目标 <strong>${formatPrice(item.target_price)}</strong></span>` : ''}
                             <span class="deal-meta-item" style="color:var(--text-muted)">添加于 ${formatDate(item.created_at)}</span>
                         </div>
                     </div>
@@ -480,7 +492,14 @@ async function addWatchlist() {
     const name = document.getElementById('watchName').value.trim();
     if (!name) { showToast('请输入酒名', 'error'); return; }
 
-    const price = parseFloat(document.getElementById('watchPrice').value) || null;
+    let price = parseFloat(document.getElementById('watchPrice').value) || null;
+    if (price) {
+        // Input is in RMB, convert to USD for backend storage
+        // rate = CNY/USD (e.g. 7.2)
+        // usd = rmb / rate
+        const rate = window.usdToCny || 7.2;
+        price = price / rate;
+    }
 
     try {
         const res = await fetch(API + '/api/watchlist', {

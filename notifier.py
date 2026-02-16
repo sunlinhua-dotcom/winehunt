@@ -19,8 +19,10 @@ def _get_config():
     return token, chat_id
 
 
+from exchange_rates import get_cached_rate
+
 def format_opportunity_message(opp: dict) -> str:
-    """格式化捡漏机会消息"""
+    """格式化捡漏机会消息 (RMB版)"""
     emoji_map = {
         "波尔多一级庄": "🏰",
         "波尔多超二级庄": "🏠",
@@ -37,6 +39,13 @@ def format_opportunity_message(opp: dict) -> str:
 
     profit_emoji = "🔥" if opp.get("profit_rate", 0) >= 30 else "💰"
 
+    # 汇率转换
+    cny_rate_val = get_cached_rate('CNY') # 1 CNY = ? USD
+    usd_to_cny = 1.0 / cny_rate_val if cny_rate_val > 0 else 7.2
+    
+    def to_rmb(usd):
+        return usd * usd_to_cny
+
     msg = f"""
 {emoji} *{opp['wine_name']}*
 {f"年份: {opp['vintage']}" if opp.get('vintage') else ""}
@@ -44,13 +53,13 @@ def format_opportunity_message(opp: dict) -> str:
 {profit_emoji} *利润率: {opp['profit_rate']:.1f}%*
 📊 评分: {opp.get('score', 'N/A')}/10
 
-💵 买入价: ${opp['buy_price']:.2f}
+💴 买入价: ¥{to_rmb(opp['buy_price']):.0f}
 🏪 商家: {opp.get('buy_merchant', 'N/A')}
 🌐 来源地: {opp.get('buy_country', 'N/A')}
 
-🇭🇰 香港售价参考: ${opp.get('sell_price_hk', 0):.2f}
-📦 全入成本: ${opp.get('total_cost', 0):.2f}
-🚢 运费: ${opp.get('shipping_cost', 0)}/瓶
+🇭🇰 香港参考: ¥{to_rmb(opp.get('sell_price_hk', 0)):.0f}
+📦 全入成本: ¥{to_rmb(opp.get('total_cost', 0)):.0f}
+🚢 运费: ¥{to_rmb(opp.get('shipping_cost', 0)):.0f}/瓶
 
 📂 分类: {category}
 ━━━━━━━━━━━━━━━━━━━━
