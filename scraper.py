@@ -245,16 +245,31 @@ def _parse_price(price_text: str) -> Optional[float]:
 
 
 def _detect_currency(price_text: str) -> str:
-    if '$' in price_text or 'USD' in price_text:
-        return 'USD'
-    elif '€' in price_text or 'EUR' in price_text:
-        return 'EUR'
-    elif '£' in price_text or 'GBP' in price_text:
-        return 'GBP'
-    elif 'HK$' in price_text or 'HKD' in price_text:
+    """检测价格文本中的货币类型（注意检测顺序：特殊符号优先于通用符号）"""
+    text_upper = price_text.upper()
+    # 先检测带前缀的特殊货币（必须在通用 $ 之前）
+    if 'HK$' in price_text or 'HKD' in text_upper:
         return 'HKD'
-    elif '¥' in price_text or 'CNY' in price_text:
+    if 'CA$' in price_text or 'CAD' in text_upper:
+        return 'CAD'
+    if 'NZ$' in price_text or 'NZD' in text_upper:
+        return 'NZD'
+    if 'AU$' in price_text or 'A$' in price_text or 'AUD' in text_upper:
+        return 'AUD'
+    # 通用货币符号
+    if '€' in price_text or 'EUR' in text_upper:
+        return 'EUR'
+    if '£' in price_text or 'GBP' in text_upper:
+        return 'GBP'
+    if '¥' in price_text or 'CNY' in text_upper or 'RMB' in text_upper:
         return 'CNY'
+    if 'CHF' in text_upper:
+        return 'CHF'
+    if '¥' in price_text or 'JPY' in text_upper:
+        return 'JPY'
+    # 最后才匹配通用 $（默认为 USD）
+    if '$' in price_text or 'USD' in text_upper:
+        return 'USD'
     return 'USD'
 
 
